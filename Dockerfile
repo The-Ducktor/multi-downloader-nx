@@ -1,41 +1,39 @@
-# Use a lightweight Node.js base image with Alpine Linux
-FROM node:alpine AS builder
-
-# Set the working directory
-WORKDIR /app
-
-# Copy the application source code
+FROM node  AS builder 
+WORKDIR "/app"
 COPY . .
 
-# Install required tools and dependencies
-RUN apk update && \
-    apk add --no-cache p7zip xdg-utils mkvtoolnix
+# Install 7z for packaging
+
+RUN apt-get update
+RUN apt-get install p7zip-full -y
 
 # Update bin-path for docker/linux
+
 RUN echo 'ffmpeg: "./bin/ffmpeg/ffmpeg"\nmkvmerge: "./bin/mkvtoolnix/mkvmerge"' > /app/config/bin-path.yml
 
-# Install pnpm and build the application
-RUN npm install -g pnpm && \
-    pnpm i && \
-    pnpm run build-linux-gui
+#Build AniDL
 
-# Build final image using Alpine Linux
-FROM node:alpine
+RUN npm install -g pnpm
+RUN pnpm i
+RUN pnpm run build-linux-gui
 
-# Set the working directory
-WORKDIR /app
+# Move build to new Clean Image
 
-# Copy the built application from the previous stage
-COPY --from=builder /app/lib/_builds/multi-downloader-nx-linux-x64-gui .
+FROM node
+WORKDIR "/app"
+COPY --from=builder /app/lib/_builds/multi-downloader-nx-linux-x64-gui ./
 
-# Install additional tools if required (e.g., xdg-utils)
-RUN apk update && \
-    apk add --no-cache xdg-utils
+# Install mkvmerge and ffmpeg
 
-# Copy mkvmerge and ffmpeg binaries
-RUN mkdir -p /app/bin/mkvtoolnix /app/bin/ffmpeg && \
-    cp /usr/bin/mkvmerge /app/bin/mkvtoolnix/mkvmerge && \
-    cp /usr/bin/ffmpeg /app/bin/ffmpeg/ffmpeg
+RUN mkdir -p /app/bin/mkvtoolnix
+RUN mkdir -p /app/bin/ffmpeg
 
-# Set the default command to run the application
+RUN apt-get update
+RUN apt-get install xdg-utils -y
+RUN apt-get install mkvtoolnix -y
+#RUN apt-get install ffmpeg -y
+
+RUN mv /usr/bin/mkvmerge /app/bin/mkvtoolnix/mkvmerge
+#RUN mv /usr/bin/ffmpeg /app/bin/ffmpeg/ffmpeg
+
 CMD [ "/app/aniDL" ]
